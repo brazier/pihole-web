@@ -75,13 +75,46 @@ function editInputField(id, type, placeholder, value) {
   );
 }
 
-function editActionButtons(dataId) {
-  return (
-    '<button type="button" class="btn btn-success btn-xs btn-save-dns-record" data-id="' +
-    dataId +
-    '" title="Save"><i class="fa fa-check"></i></button>' +
-    '<button type="button" class="btn btn-default btn-xs btn-cancel-dns-record" title="Cancel"><i class="fa fa-xmark"></i></button>'
-  );
+function createIconButton(styleClasses, options) {
+  const button = document.createElement("button");
+  button.type = "button";
+  if (options.id) {
+    button.id = options.id;
+  }
+  button.classList.add("btn", "btn-xs", ...styleClasses);
+  if (options.extraClasses) {
+    button.classList.add(...options.extraClasses);
+  }
+  if (options.title) {
+    button.title = options.title;
+  }
+  if (options.disabled) {
+    button.disabled = true;
+  }
+  if (options.dataset) {
+    for (const [key, value] of Object.entries(options.dataset)) {
+      button.dataset[key] = value;
+    }
+  }
+  const icon = document.createElement("span");
+  icon.classList.add(...options.iconClasses);
+  button.append(icon);
+  return button;
+}
+
+function appendEditActionButtons(cell, dataId) {
+  const saveButton = createIconButton(["btn-success"], {
+    extraClasses: ["btn-save-dns-record"],
+    title: "Save",
+    iconClasses: ["fa", "fa-check"],
+    dataset: { id: dataId },
+  });
+  const cancelButton = createIconButton(["btn-default"], {
+    extraClasses: ["btn-cancel-dns-record"],
+    title: "Cancel",
+    iconClasses: ["fa", "fa-xmark"],
+  });
+  cell.append(saveButton, cancelButton);
 }
 
 function buildEditRow(endpoint, data) {
@@ -112,7 +145,9 @@ function buildEditRow(endpoint, data) {
         utils.escapeHtml(hostsIP(data))
       )
     );
-    appendCell(editActionButtons(dataId));
+    const actionCell = document.createElement("td");
+    appendEditActionButtons(actionCell, dataId);
+    editTr.append(actionCell);
     return $(editTr);
   }
 
@@ -135,7 +170,9 @@ function buildEditRow(endpoint, data) {
   appendCell(
     editInputField("edit-cname-ttl-" + dataId, "numeric", "", utils.escapeHtml(CNAMEttlRaw(data)))
   );
-  appendCell(editActionButtons(dataId));
+  const actionCell = document.createElement("td");
+  appendEditActionButtons(actionCell, dataId);
+  editTr.append(actionCell);
   return $(editTr);
 }
 
@@ -329,30 +366,20 @@ function populateDataTable(endpoint) {
     rowCallback(row, data) {
       $(row).attr("data-id", data);
 
-      const editButton = document.createElement("button");
-      editButton.type = "button";
-      editButton.id = `edit${endpoint}${utils.hexEncode(data)}`;
-      editButton.classList.add("btn", "btn-warning", "btn-xs");
-      editButton.dataset.action = "edit";
-      editButton.dataset.type = endpoint;
-      editButton.disabled = disabledByEnv[endpoint];
-      editButton.title = "Edit record";
-      const editIcon = document.createElement("span");
-      editIcon.classList.add("fas", "fa-pencil-alt");
-      editButton.append(editIcon);
-
-      const deleteButton = document.createElement("button");
-      deleteButton.type = "button";
-      deleteButton.id = `delete${endpoint}${utils.hexEncode(data)}`;
-      deleteButton.classList.add("btn", "btn-danger", "btn-xs");
-      deleteButton.dataset.action = "delete";
-      deleteButton.dataset.type = endpoint;
-      deleteButton.dataset.tag = data;
-      deleteButton.disabled = disabledByEnv[endpoint];
-      deleteButton.title = "Delete record";
-      const deleteIcon = document.createElement("span");
-      deleteIcon.classList.add("far", "fa-trash-alt");
-      deleteButton.append(deleteIcon);
+      const editButton = createIconButton(["btn-warning"], {
+        id: `edit${endpoint}${utils.hexEncode(data)}`,
+        title: "Edit record",
+        iconClasses: ["fas", "fa-pencil-alt"],
+        dataset: { action: "edit", type: endpoint },
+        disabled: disabledByEnv[endpoint],
+      });
+      const deleteButton = createIconButton(["btn-danger"], {
+        id: `delete${endpoint}${utils.hexEncode(data)}`,
+        title: "Delete record",
+        iconClasses: ["far", "fa-trash-alt"],
+        dataset: { action: "delete", type: endpoint, tag: data },
+        disabled: disabledByEnv[endpoint],
+      });
 
       $(`td:eq(${actionColumnIndex(endpoint)})`, row).empty().append(editButton, deleteButton);
     },
