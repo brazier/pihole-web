@@ -21,7 +21,7 @@ mg.include('scripts/lua/settings_header.lp','r')
             </div>
             <div class="box-body">
                 <div class="row">
-                    <div class="col-md-12">
+                    <div class="col-md-12 col-lg-6">
                         <h3 class="box-title">List of local DNS records</h3>
                             <!-- /.box-header -->
                         <table id="hosts-Table" class="table table-striped table-bordered" width="100%">
@@ -55,7 +55,7 @@ mg.include('scripts/lua/settings_header.lp','r')
             </div>
         </div>
     </div>
-    <div class="col-md-12">
+    <div class="col-md-12 col-lg-6">
         <div class="box">
             <div class="box-header with-border">
                 <h3 class="box-title" id="title-cnameRecords" data-configkeys="dns.cnameRecords">Local CNAME records</h3>
