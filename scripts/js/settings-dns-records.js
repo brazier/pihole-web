@@ -34,25 +34,25 @@ function hostsIP(data) {
   return ip;
 }
 
-function CNAMEdomain(data) {
+function cnameDomain(data) {
   // Split record in format <cname>,<target>[,<TTL>]
   const CNAMEarr = data.split(",");
   return CNAMEarr[0].trim();
 }
 
-function CNAMEtarget(data) {
+function cnameTarget(data) {
   // Split record in format <cname>,<target>[,<TTL>]
   const CNAMEarr = data.split(",");
   return CNAMEarr[1].trim();
 }
 
-function CNAMEttl(data) {
+function cnameTtl(data) {
   // Split record in format <cname>,<target>[,<TTL>]
   const CNAMEarr = data.split(",");
   return CNAMEarr.length > 2 ? CNAMEarr[2] : "-";
 }
 
-function CNAMEttlRaw(data) {
+function cnameTtlRaw(data) {
   const CNAMEarr = data.split(",");
   return CNAMEarr.length > 2 ? CNAMEarr[2].trim() : "";
 }
@@ -81,21 +81,27 @@ function createIconButton(styleClasses, options) {
   if (options.id) {
     button.id = options.id;
   }
+
   button.classList.add("btn", "btn-xs", ...styleClasses);
+
   if (options.extraClasses) {
     button.classList.add(...options.extraClasses);
   }
+
   if (options.title) {
     button.title = options.title;
   }
+
   if (options.disabled) {
     button.disabled = true;
   }
+
   if (options.dataset) {
     for (const [key, value] of Object.entries(options.dataset)) {
       button.dataset[key] = value;
     }
   }
+
   const icon = document.createElement("span");
   icon.classList.add(...options.iconClasses);
   button.append(icon);
@@ -156,7 +162,7 @@ function buildEditRow(endpoint, data) {
       "edit-cname-domain-" + dataId,
       "url",
       "Domain",
-      utils.escapeHtml(CNAMEdomain(data))
+      utils.escapeHtml(cnameDomain(data))
     )
   );
   appendCell(
@@ -164,11 +170,11 @@ function buildEditRow(endpoint, data) {
       "edit-cname-target-" + dataId,
       "url",
       "Target Domain",
-      utils.escapeHtml(CNAMEtarget(data))
+      utils.escapeHtml(cnameTarget(data))
     )
   );
   appendCell(
-    editInputField("edit-cname-ttl-" + dataId, "numeric", "", utils.escapeHtml(CNAMEttlRaw(data)))
+    editInputField("edit-cname-ttl-" + dataId, "numeric", "", utils.escapeHtml(cnameTtlRaw(data)))
   );
   const actionCell = document.createElement("td");
   appendEditActionButtons(actionCell, dataId);
@@ -190,7 +196,7 @@ function toggleEditRow(endpoint, button) {
   const dataTr = $(button).closest("tr");
   const table = $(`#${endpoint}-Table`).DataTable();
 
-  if (dataTr.next("tr.dns-record-edit-row").length) {
+  if (dataTr.next("tr.dns-record-edit-row").length > 0) {
     closeEditRow(endpoint, dataTr);
     return;
   }
@@ -222,8 +228,7 @@ function buildCnameRecord(dataId) {
       .val()
       .trim();
   const ttlVal = Number.parseInt($("#edit-cname-ttl-" + dataId).val(), 10);
-  // eslint-disable-next-line unicorn/prefer-number-properties
-  if (isFinite(ttlVal) && ttlVal >= 0) elem += "," + ttlVal;
+  if (Number.isFinite(ttlVal) && ttlVal >= 0) elem += "," + ttlVal;
   return elem;
 }
 
@@ -323,9 +328,9 @@ function populateDataTable(endpoint) {
     ];
   } else {
     columns = [
-      { data: null, render: CNAMEdomain },
-      { data: null, render: CNAMEtarget },
-      { data: null, width: "40px", render: CNAMEttl },
+      { data: null, render: cnameDomain },
+      { data: null, render: cnameTarget },
+      { data: null, width: "40px", render: cnameTtl },
       { data: null, width: "70px", orderable: false },
     ];
   }
@@ -491,7 +496,7 @@ $(() => {
   populateDataTable("hosts");
   populateDataTable("cnameRecords");
 
-  ["hosts", "cnameRecords"].forEach(endpoint => {
+  for (const endpoint of ["hosts", "cnameRecords"]) {
     const tableId = `#${endpoint}-Table`;
 
     $(`${tableId} tbody`).on("click", "button[data-action='edit']", function (event) {
@@ -522,7 +527,7 @@ $(() => {
         updateCnameRecord(oldTag, buildCnameRecord(dataId), dataTr);
       }
     });
-  });
+  }
 
   $("#btnAdd-host").on("click", () => {
     utils.disableAll();
@@ -552,9 +557,7 @@ $(() => {
     utils.disableAll();
     let elem = $("#Cdomain").val().trim() + "," + $("#Ctarget").val().trim();
     const ttlVal = Number.parseInt($("#Cttl").val(), 10);
-    // TODO Fix eslint
-    // eslint-disable-next-line unicorn/prefer-number-properties
-    if (isFinite(ttlVal) && ttlVal >= 0) elem += "," + ttlVal;
+    if (Number.isFinite(ttlVal) && ttlVal >= 0) elem += "," + ttlVal;
     const url =
       document.body.dataset.apiurl + "/config/dns/cnameRecords/" + encodeURIComponent(elem);
     utils.showAlert("info", "", "Adding DNS record...", elem);
