@@ -381,7 +381,9 @@ function populateDataTable(endpoint) {
         disabled: disabledByEnv[endpoint],
       });
 
-      $(`td:eq(${actionColumnIndex(endpoint)})`, row).empty().append(editButton, deleteButton);
+      $(`td:eq(${actionColumnIndex(endpoint)})`, row)
+        .empty()
+        .append(editButton, deleteButton);
     },
     dom:
       "<'row'<'col-sm-5'l><'col-sm-7'f>>" +
