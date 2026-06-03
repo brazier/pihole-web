@@ -9,6 +9,11 @@
 
 "use strict";
 
+const disabledByEnv = {
+  hosts: false,
+  cnameRecords: false,
+};
+
 function hostsDomain(data) {
   // Split record in format IP NAME1 [NAME2 [NAME3 [NAME...]]]
   // We split both on spaces and tabs to support both formats
@@ -47,24 +52,247 @@ function CNAMEttl(data) {
   return CNAMEarr.length > 2 ? CNAMEarr[2] : "-";
 }
 
+function CNAMEttlRaw(data) {
+  const CNAMEarr = data.split(",");
+  return CNAMEarr.length > 2 ? CNAMEarr[2].trim() : "";
+}
+
+function actionColumnIndex(endpoint) {
+  return endpoint === "hosts" ? 2 : 3;
+}
+
+function editInputField(id, type, placeholder, value) {
+  return (
+    '<input id="' +
+    id +
+    '" type="' +
+    type +
+    '" class="form-control" placeholder="' +
+    placeholder +
+    '" value="' +
+    value +
+    '" autocomplete="off" spellcheck="false" autocapitalize="none" autocorrect="off">'
+  );
+}
+
+function editActionButtons(dataId) {
+  return (
+    '<button type="button" class="btn btn-success btn-xs btn-save-dns-record" data-id="' +
+    dataId +
+    '" title="Save"><i class="fa fa-check"></i></button>' +
+    '<button type="button" class="btn btn-default btn-xs btn-cancel-dns-record" title="Cancel"><i class="fa fa-xmark"></i></button>'
+  );
+}
+
+function buildEditRow(endpoint, data) {
+  const dataId = utils.hexEncode(data);
+  const editTr = document.createElement("tr");
+  editTr.classList.add("dns-record-edit-row");
+
+  const appendCell = html => {
+    const td = document.createElement("td");
+    td.innerHTML = html;
+    editTr.append(td);
+  };
+
+  if (endpoint === "hosts") {
+    appendCell(
+      editInputField(
+        "edit-host-domain-" + dataId,
+        "url",
+        "Domain",
+        utils.escapeHtml(hostsDomain(data))
+      )
+    );
+    appendCell(
+      editInputField(
+        "edit-host-ip-" + dataId,
+        "text",
+        "Associated IP",
+        utils.escapeHtml(hostsIP(data))
+      )
+    );
+    appendCell(editActionButtons(dataId));
+    return $(editTr);
+  }
+
+  appendCell(
+    editInputField(
+      "edit-cname-domain-" + dataId,
+      "url",
+      "Domain",
+      utils.escapeHtml(CNAMEdomain(data))
+    )
+  );
+  appendCell(
+    editInputField(
+      "edit-cname-target-" + dataId,
+      "url",
+      "Target Domain",
+      utils.escapeHtml(CNAMEtarget(data))
+    )
+  );
+  appendCell(
+    editInputField("edit-cname-ttl-" + dataId, "numeric", "", utils.escapeHtml(CNAMEttlRaw(data)))
+  );
+  appendCell(editActionButtons(dataId));
+  return $(editTr);
+}
+
+function closeAllEditRows(endpoint) {
+  $(`#${endpoint}-Table tbody tr.dns-record-edit-row`).remove();
+  $(`#${endpoint}-Table tbody tr.shown`).removeClass("shown");
+}
+
+function closeEditRow(endpoint, dataTr) {
+  dataTr.next("tr.dns-record-edit-row").remove();
+  dataTr.removeClass("shown");
+}
+
+function toggleEditRow(endpoint, button) {
+  const dataTr = $(button).closest("tr");
+  const table = $(`#${endpoint}-Table`).DataTable();
+
+  if (dataTr.next("tr.dns-record-edit-row").length) {
+    closeEditRow(endpoint, dataTr);
+    return;
+  }
+
+  closeAllEditRows(endpoint);
+  buildEditRow(endpoint, table.row(dataTr).data()).insertAfter(dataTr);
+  dataTr.addClass("shown");
+}
+
+function buildHostsRecord(dataId) {
+  return (
+    $("#edit-host-ip-" + dataId)
+      .val()
+      .trim() +
+    " " +
+    $("#edit-host-domain-" + dataId)
+      .val()
+      .trim()
+  );
+}
+
+function buildCnameRecord(dataId) {
+  let elem =
+    $("#edit-cname-domain-" + dataId)
+      .val()
+      .trim() +
+    "," +
+    $("#edit-cname-target-" + dataId)
+      .val()
+      .trim();
+  const ttlVal = Number.parseInt($("#edit-cname-ttl-" + dataId).val(), 10);
+  // eslint-disable-next-line unicorn/prefer-number-properties
+  if (isFinite(ttlVal) && ttlVal >= 0) elem += "," + ttlVal;
+  return elem;
+}
+
+function updateHostsRecord(oldTag, newTag, dataTr) {
+  if (oldTag === newTag) {
+    closeEditRow("hosts", dataTr);
+    return;
+  }
+
+  utils.disableAll();
+  utils.showAlert("info", "", "Updating DNS record...", newTag);
+  const baseUrl = document.body.dataset.apiurl + "/config/dns/hosts/";
+  const deleteUrl = baseUrl + encodeURIComponent(oldTag);
+  const putUrl = baseUrl + encodeURIComponent(newTag);
+
+  $.ajax({
+    url: deleteUrl,
+    method: "DELETE",
+  })
+    .then(() =>
+      $.ajax({
+        url: putUrl,
+        method: "PUT",
+      })
+    )
+    .done(() => {
+      utils.enableAll();
+      utils.showAlert("success", "fas fa-pencil-alt", "Successfully updated DNS record", newTag);
+      $("#hosts-Table").DataTable().ajax.reload(null, false);
+    })
+    .fail((data, exception) => {
+      utils.enableAll();
+      apiFailure(data);
+      utils.showAlert(
+        "error",
+        "",
+        "Error while updating DNS record: <code>" + utils.escapeHtml(oldTag) + "</code>",
+        data.responseText
+      );
+      console.log(exception); // eslint-disable-line no-console
+    });
+}
+
+function updateCnameRecord(oldTag, newTag, dataTr) {
+  if (oldTag === newTag) {
+    closeEditRow("cnameRecords", dataTr);
+    return;
+  }
+
+  utils.disableAll();
+  utils.showAlert("info", "", "Updating local CNAME record...", newTag);
+  const baseUrl = document.body.dataset.apiurl + "/config/dns/cnameRecords/";
+  const deleteUrl = baseUrl + encodeURIComponent(oldTag);
+  const putUrl = baseUrl + encodeURIComponent(newTag);
+
+  $.ajax({
+    url: deleteUrl,
+    method: "DELETE",
+  })
+    .then(() =>
+      $.ajax({
+        url: putUrl,
+        method: "PUT",
+      })
+    )
+    .done(() => {
+      utils.enableAll();
+      utils.showAlert(
+        "success",
+        "fas fa-pencil-alt",
+        "Successfully updated local CNAME record",
+        newTag
+      );
+      utils.loadingOverlay(true);
+      $("#cnameRecords-Table").DataTable().ajax.reload(null, false);
+    })
+    .fail((data, exception) => {
+      utils.enableAll();
+      apiFailure(data);
+      utils.showAlert(
+        "error",
+        "",
+        "Error while updating CNAME record: <code>" + utils.escapeHtml(oldTag) + "</code>",
+        data.responseText
+      );
+      console.log(exception); // eslint-disable-line no-console
+    });
+}
+
 function populateDataTable(endpoint) {
   let columns = "";
   if (endpoint === "hosts") {
     columns = [
       { data: null, render: hostsDomain },
       { data: null, type: "ip-address", render: hostsIP },
-      { data: null, width: "22px", orderable: false },
+      { data: null, width: "70px", orderable: false },
     ];
   } else {
     columns = [
       { data: null, render: CNAMEdomain },
       { data: null, render: CNAMEtarget },
       { data: null, width: "40px", render: CNAMEttl },
-      { data: null, width: "22px", orderable: false },
+      { data: null, width: "70px", orderable: false },
     ];
   }
 
-  const setByEnv = false;
   $.ajax({
     url: document.body.dataset.apiurl + "/config/dns/" + endpoint + "?detailed=true",
   }).done(data => {
@@ -73,7 +301,9 @@ function populateDataTable(endpoint) {
 
     // disable input fields if set by env var
     if (data.config.dns[endpoint].flags.env_var) {
+      disabledByEnv[endpoint] = true;
       $(`.${endpoint}`).prop("disabled", true);
+      $(`#${endpoint}-Table`).DataTable().rows().invalidate().draw(false);
     }
   });
 
@@ -92,35 +322,39 @@ function populateDataTable(endpoint) {
       },
     ],
     drawCallback() {
-      $(`button[id^="delete${endpoint}"]`).on("click", deleteRecord);
-
+      closeAllEditRows(endpoint);
       // Remove visible dropdown to prevent orphaning
       $("body > .bootstrap-select.dropdown").remove();
     },
     rowCallback(row, data) {
       $(row).attr("data-id", data);
 
-      // Create delete button
-      const button = document.createElement("button");
+      const editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.id = `edit${endpoint}${utils.hexEncode(data)}`;
+      editButton.classList.add("btn", "btn-warning", "btn-xs");
+      editButton.dataset.action = "edit";
+      editButton.dataset.type = endpoint;
+      editButton.disabled = disabledByEnv[endpoint];
+      editButton.title = "Edit record";
+      const editIcon = document.createElement("span");
+      editIcon.classList.add("fas", "fa-pencil-alt");
+      editButton.append(editIcon);
 
-      // Set button ID and add CSS classes
-      button.id = `delete${endpoint}${utils.hexEncode(data)}`;
-      button.classList.add("btn", "btn-danger", "btn-xs");
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.id = `delete${endpoint}${utils.hexEncode(data)}`;
+      deleteButton.classList.add("btn", "btn-danger", "btn-xs");
+      deleteButton.dataset.action = "delete";
+      deleteButton.dataset.type = endpoint;
+      deleteButton.dataset.tag = data;
+      deleteButton.disabled = disabledByEnv[endpoint];
+      deleteButton.title = "Delete record";
+      const deleteIcon = document.createElement("span");
+      deleteIcon.classList.add("far", "fa-trash-alt");
+      deleteButton.append(deleteIcon);
 
-      // Set data-* attributes
-      button.dataset.type = endpoint;
-      button.dataset.tag = data;
-
-      // Disable the button if set by environment variables
-      button.disabled = setByEnv;
-
-      // Add a trash icon to the button
-      const iconSpan = document.createElement("span");
-      iconSpan.classList.add("far", "fa-trash-alt");
-      button.append(iconSpan);
-
-      // Add the button to the table row
-      $(`td:eq(${endpoint === "hosts" ? 2 : 3})`, row).html(button);
+      $(`td:eq(${actionColumnIndex(endpoint)})`, row).empty().append(editButton, deleteButton);
     },
     dom:
       "<'row'<'col-sm-5'l><'col-sm-7'f>>" +
@@ -227,6 +461,39 @@ function delCNAME(elem) {
 $(() => {
   populateDataTable("hosts");
   populateDataTable("cnameRecords");
+
+  ["hosts", "cnameRecords"].forEach(endpoint => {
+    const tableId = `#${endpoint}-Table`;
+
+    $(`${tableId} tbody`).on("click", "button[data-action='edit']", function (event) {
+      event.stopPropagation();
+      toggleEditRow(endpoint, this);
+    });
+
+    $(`${tableId} tbody`).on("click", "button[data-action='delete']", function (event) {
+      event.stopPropagation();
+      deleteRecord.call(this);
+    });
+
+    $(tableId).on("click", ".btn-cancel-dns-record", function (event) {
+      event.stopPropagation();
+      const dataTr = $(this).closest("tr.dns-record-edit-row").prev();
+      closeEditRow(endpoint, dataTr);
+    });
+
+    $(tableId).on("click", ".btn-save-dns-record", function (event) {
+      event.stopPropagation();
+      const dataId = $(this).attr("data-id");
+      const dataTr = $(this).closest("tr.dns-record-edit-row").prev();
+      const oldTag = dataTr.attr("data-id");
+
+      if (endpoint === "hosts") {
+        updateHostsRecord(oldTag, buildHostsRecord(dataId), dataTr);
+      } else {
+        updateCnameRecord(oldTag, buildCnameRecord(dataId), dataTr);
+      }
+    });
+  });
 
   $("#btnAdd-host").on("click", () => {
     utils.disableAll();
