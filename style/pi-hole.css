@@ -145,6 +145,36 @@ td.lookatme {
   font-weight: 700;
 }
 
+table.dataTable thead th.dns-domain-label-sort-header,
+table.dataTable thead th.dns-domain-label-sort-header.sorting,
+table.dataTable thead th.dns-domain-label-sort-header.sorting_asc,
+table.dataTable thead th.dns-domain-label-sort-header.sorting_desc {
+  position: relative;
+  white-space: nowrap;
+  padding-right: 58px !important;
+}
+
+.dns-domain-label-sort-btn {
+  position: absolute;
+  right: 34px;
+  top: 50%;
+  z-index: 1;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  line-height: 1.42857143;
+  transform: translateY(-50%);
+  vertical-align: middle;
+}
+
+.dns-domain-label-sort-btn.active {
+  opacity: 1;
+}
+
+.dns-domain-label-sort-icon.text-muted {
+  opacity: 0.45;
+}
+
 .vertical-alignment-helper {
   display: table;
   width: 100%;

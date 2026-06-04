@@ -5,7 +5,7 @@
  *  This file is copyright under the latest version of the EUPL.
  *  Please see LICENSE file for your rights under this license. */
 
-/* global utils: false, apiFailure:false, setConfigValues: false */
+/* global utils: false, apiFailure:false, setConfigValues: false, initDomainLabelSortHeader: false */
 
 "use strict";
 
@@ -13,6 +13,8 @@ const disabledByEnv = {
   hosts: false,
   cnameRecords: false,
 };
+
+const domainLabelSortControls = {};
 
 function hostsDomain(data) {
   // Split record in format IP NAME1 [NAME2 [NAME3 [NAME...]]]
@@ -322,13 +324,13 @@ function populateDataTable(endpoint) {
   let columns = "";
   if (endpoint === "hosts") {
     columns = [
-      { data: null, render: hostsDomain },
+      { data: null, type: "string", render: hostsDomain },
       { data: null, type: "ip-address", render: hostsIP },
       { data: null, width: "70px", orderable: false },
     ];
   } else {
     columns = [
-      { data: null, render: cnameDomain },
+      { data: null, type: "string", render: cnameDomain },
       { data: null, render: cnameTarget },
       { data: null, width: "40px", render: cnameTtl },
       { data: null, width: "70px", orderable: false },
@@ -410,7 +412,22 @@ function populateDataTable(endpoint) {
     stateSave: true,
     stateDuration: 0,
     processing: true,
+    initComplete() {
+      const table = $(`#${endpoint}-Table`).DataTable();
+      domainLabelSortControls[endpoint] = initDomainLabelSortHeader(table, 0);
+      const loadedState = table.settings()[0].oLoadedState;
+      if (loadedState?.domainLabelSort) {
+        domainLabelSortControls[endpoint].applySavedDirection(loadedState.domainLabelSort);
+      }
+    },
     stateSaveCallback(settings, data) {
+      const control = domainLabelSortControls[endpoint];
+      if (control?.isActive()) {
+        data.domainLabelSort = control.getDirection();
+      } else {
+        delete data.domainLabelSort;
+      }
+
       utils.stateSaveCallback(`${endpoint}-records-table`, data);
     },
     stateLoadCallback() {
